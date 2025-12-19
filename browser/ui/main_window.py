@@ -1,4 +1,5 @@
-from typing import cast, Optional, Union
+from PySide6.QtNetwork import QNetworkInformation
+from typing import cast, Union
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
     QToolBar, QLineEdit, QTabBar, QStackedWidget,
@@ -7,6 +8,8 @@ from PySide6.QtWidgets import (
 from PySide6.QtGui import QAction, QIcon
 from PySide6.QtCore import QUrl, QSize, Qt
 from PySide6.QtWebEngineWidgets import QWebEngineView
+from PySide6.QtWebEngineCore import QWebEngineProfile
+from qtawesome import reset_cache
 
 # Optional icons
 try:
@@ -27,6 +30,9 @@ class MainWindow(QMainWindow):
         self.controller = controller
         self.setWindowTitle("Sagittarius Browser")
         self.resize(1200, 800)
+
+        self.net_info = QNetworkInformation.instance()
+
 
         # -------- Central widget --------
         central = QWidget(self)
@@ -103,7 +109,7 @@ class MainWindow(QMainWindow):
     # ==================================================
     def add_tab(self, url: Union[str, bool, None] = None):
         if not isinstance(url, str):
-            url = "https://search.brave.com"
+            url = "https://www.google.com"
 
         view = self.controller.create_view()
         view.setUrl(QUrl(url))
@@ -126,9 +132,25 @@ class MainWindow(QMainWindow):
         # --- SIGNALS ---
         view.titleChanged.connect(lambda t, v=view: self._update_title(v, t))
         view.urlChanged.connect(self.update_url_bar)
-        
-        # THIS WAS MISSING: Connect the icon signal
         view.iconChanged.connect(lambda i, v=view: self._update_icon(v, i))
+
+        def on_load_finished(ok: bool, v = view):
+            if not ok:
+                v.setHtml(
+                    """
+                    <html>
+                      <body style="font-family:sans-serif;background:#111;color:#eee;
+                                   display:flex;align-items:center;justify-content:center;height:100vh;">
+                        <div>
+                          <h2>Connection lost</h2>
+                          <p>Please check your internet connection.</p>
+                        </div>
+                      </body>
+                    </html>
+                    """
+                )
+
+        view.loadFinished.connect(on_load_finished)
 
     def _update_icon(self, view: QWebEngineView, icon: QIcon):
         """Updates the tab icon when the website favicon loads."""
@@ -164,15 +186,38 @@ class MainWindow(QMainWindow):
     # Navigation
     # ==================================================
     def load_url(self):
+        view = cast(QWebEngineView, self.pages.currentWidget())
+        if not view:
+            return
+
+        # ---- FIX 3: offline check ----
+        if not self.net_info.reachability() == QNetworkInformation.Reachability.Disconnected:
+            view.setHtml(
+                """
+                <html>
+                  <body style="font-family:sans-serif;background:#111;color:#eee;
+                               display:flex;align-items:center;justify-content:center;height:100vh;">
+                    <div>
+                      <h2>Offline</h2>
+                      <p>No internet connection.</p>
+                    </div>
+                  </body>
+                </html>
+                """
+            )
+            return
+
         text = self.url_bar.text().strip()
-        if not text: return
+        if not text:
+            return
+
         if " " in text and "." not in text:
-            text = f"https://search.brave.com/search?q={text}"
+            text = f"https://www.google.com/search?q={text}"
         elif not text.startswith("http"):
             text = "https://" + text
-        
-        view = cast(QWebEngineView, self.pages.currentWidget())
-        if view: view.setUrl(QUrl(text))
+
+        view.setUrl(QUrl(text))
+
 
     def update_url_bar(self):
         view = self.pages.currentWidget()

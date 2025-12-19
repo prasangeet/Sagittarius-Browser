@@ -1,10 +1,24 @@
+import os
+
+os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
+    "--disable-features=NetworkServiceSandbox"
+)
+
+
 import sys
 from PySide6.QtWidgets import QApplication
 from browser.controller.browser_controller import BrowserController
 from browser.ui.main_window import MainWindow
+from PySide6.QtWebEngineCore import QWebEngineProfile
 
 def main():
     app = QApplication(sys.argv)
+
+    profile = QWebEngineProfile.defaultProfile()
+    profile.setHttpCacheType(QWebEngineProfile.HttpCacheType.DiskHttpCache)
+    profile.setPersistentCookiesPolicy(
+        QWebEngineProfile.PersistentCookiesPolicy.AllowPersistentCookies
+    )
     
     font = app.font()
     font.setFamily("Segoe UI")
