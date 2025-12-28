@@ -1,5 +1,104 @@
-.venv
-.git
-./test_files
-./pyrightconfig.json
-./test
+# =========================
+# Python
+# =========================
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# =========================
+# Qt / PySide / QtCreator
+# =========================
+*.pro.user
+*.qmlc
+*.qrc
+*.qmltypes
+.ui_autosave
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+
+# =========================
+# Qt WebEngine / Chromium
+# =========================
+# WebEngine cache, cookies, storage
+QtWebEngine/
+QtWebEngineProcess
+webengine/
+chromium/
+Cache/
+GPUCache/
+Code Cache/
+Cookies
+Service Worker/
+IndexedDB/
+Local Storage/
+Session Storage/
+Media Cache/
+
+# =========================
+# Logs & Debug
+# =========================
+*.log
+*.trace
+*.stackdump
+core
+core.*
+
+# =========================
+# OS / Editor
+# =========================
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# Neovim
+.nvim/
+.nvimrc
+.vim/
+.vimrc
+
+# VS Code (if ever used)
+.vscode/
+
+# =========================
+# Test & Temp folders
+# =========================
+test_files/
+test/
+.pytest_cache/
+.coverage
+htmlcov/
+
+# =========================
+# Build / Dist
+# =========================
+build/
+dist/
+*.spec
+
+# =========================
+# Pyright / Type Checkers
+# =========================
+.pyright/
+.pyrightconfig.json.bak
+
+# =========================
+# Environment / Secrets
+# =========================
+.env
+.env.*
+

@@ -1,30 +1,23 @@
 from PySide6.QtNetwork import QNetworkInformation
-from typing import cast, Union
+from typing import Optional, cast, Union
 from PySide6.QtWidgets import (
     QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QToolBar, QLineEdit, QTabBar, QStackedWidget,
+    QToolBar, QTabBar, QStackedWidget,
     QToolButton, QStyle
 )
 from PySide6.QtGui import QAction, QIcon
-from PySide6.QtCore import QUrl, QSize, Qt
+from PySide6.QtCore import QUrl, QSize
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from PySide6.QtWebEngineCore import QWebEngineProfile
-from qtawesome import reset_cache
-
+from .address_bar import AddressBar
+from .browser_tab import BrowserTab
 # Optional icons
 try:
     import qtawesome as qta
 except ImportError:
     qta = None
 
-class AddressBar(QLineEdit):
-    def __init__(self):
-        super().__init__()
-        self.setFixedHeight(34)
-        self.setPlaceholderText("Search or enter address")
-        self.setTextMargins(16, 0, 16, 0)
-
 class MainWindow(QMainWindow):
+    net_info : Optional[QNetworkInformation]
     def __init__(self, controller):
         super().__init__()
         self.controller = controller
@@ -111,15 +104,14 @@ class MainWindow(QMainWindow):
         if not isinstance(url, str):
             url = "https://www.google.com"
 
-        view = self.controller.create_view()
-        view.setUrl(QUrl(url))
+        view = BrowserTab(url)
 
         index = self.pages.addWidget(view)
         self.tab_bar.addTab("New Tab")
         
         # --- MANUAL CLOSE BUTTON ---
         close_btn = QToolButton()
-        close_btn.setText("✕") 
+        close_btn.setText("✕")
         close_btn.setObjectName("TabCloseButton")
         close_btn.setToolTip("Close Tab")
         close_btn.clicked.connect(self.close_tab_from_button)
@@ -133,24 +125,6 @@ class MainWindow(QMainWindow):
         view.titleChanged.connect(lambda t, v=view: self._update_title(v, t))
         view.urlChanged.connect(self.update_url_bar)
         view.iconChanged.connect(lambda i, v=view: self._update_icon(v, i))
-
-        def on_load_finished(ok: bool, v = view):
-            if not ok:
-                v.setHtml(
-                    """
-                    <html>
-                      <body style="font-family:sans-serif;background:#111;color:#eee;
-                                   display:flex;align-items:center;justify-content:center;height:100vh;">
-                        <div>
-                          <h2>Connection lost</h2>
-                          <p>Please check your internet connection.</p>
-                        </div>
-                      </body>
-                    </html>
-                    """
-                )
-
-        view.loadFinished.connect(on_load_finished)
 
     def _update_icon(self, view: QWebEngineView, icon: QIcon):
         """Updates the tab icon when the website favicon loads."""
@@ -191,27 +165,28 @@ class MainWindow(QMainWindow):
             return
 
         # ---- FIX 3: offline check ----
-        if not self.net_info.reachability() == QNetworkInformation.Reachability.Disconnected:
-            view.setHtml(
-                """
-                <html>
-                  <body style="font-family:sans-serif;background:#111;color:#eee;
-                               display:flex;align-items:center;justify-content:center;height:100vh;">
-                    <div>
-                      <h2>Offline</h2>
-                      <p>No internet connection.</p>
-                    </div>
-                  </body>
-                </html>
-                """
-            )
-            return
+        if self.net_info is not None:
+            if self.net_info.reachability() == QNetworkInformation.Reachability.Disconnected:
+                view.setHtml(
+                    """
+                    <html>
+                      <body style="font-family:sans-serif;background:#111;color:#eee;
+                                   display:flex;align-items:center;justify-content:center;height:100vh;">
+                        <div>
+                          <h2>Offline</h2>
+                          <p>No internet connection.</p>
+                        </div>
+                      </body>
+                    </html>
+                    """
+                )
+                return
 
         text = self.url_bar.text().strip()
         if not text:
             return
 
-        if " " in text and "." not in text:
+        if "." not in text:
             text = f"https://www.google.com/search?q={text}"
         elif not text.startswith("http"):
             text = "https://" + text
