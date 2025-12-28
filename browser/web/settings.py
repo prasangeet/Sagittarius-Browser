@@ -4,7 +4,7 @@ from browser.utils.debug import dbg
 def apply_chromium_flags():
     dbg("Applying Chromium flags")
 
-    os.environ["QT_QPA_PLATFORM"] = "wayland"
+    os.environ["QT_QPA_PLATFORM"] = "xcb"
     os.environ["QTWEBENGINE_DISABLE_SANDBOX"] = "1"
     os.environ["QTWEBENGINE_CHROMIUM_FLAGS"] = (
         "--disable-dev-shm-usage "

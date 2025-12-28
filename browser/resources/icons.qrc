@@ -1,5 +1,5 @@
 <RCC>
-  <qresource prefix="icons">
+  <qresource prefix="/icons">
     <file>icons/back.svg</file>
     <file>icons/forward.svg</file>
     <file>icons/new_tab.svg</file>

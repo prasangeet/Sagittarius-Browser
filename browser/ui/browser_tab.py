@@ -1,19 +1,28 @@
+from PySide6.QtCore import QUrl, Qt
 from PySide6.QtWebEngineWidgets import QWebEngineView
 from PySide6.QtWebEngineCore import QWebEnginePage
-from PySide6.QtCore import QUrl
 from browser.utils.debug import dbg
 
-OFFLINE_HTML = """<h1>Offline</h1>"""
+OFFLINE_HTML = "<h1>Offline</h1>"
+
 
 class BrowserTab(QWebEngineView):
-    def __init__(self, page: QWebEnginePage, url: str | None = None):
+    def __init__(self, profile, url: str | None = None, parent=None):
         dbg("BrowserTab.__init__ start")
 
-        super().__init__()
-        dbg("QWebEngineView constructed")
+        # IMPORTANT: create without parent first
+        super().__init__(None)
 
+        # ✅ Qt6-correct widget attributes
+        # self.setAttribute(Qt.WidgetAttribute.WA_NativeWindow, True)
+        # self.setAttribute(Qt.WidgetAttribute.WA_DontCreateNativeAncestors, True)
+
+        # ✅ Qt6-correct page creation
+        page = QWebEnginePage(profile, self)
         self.setPage(page)
-        dbg("Page attached to view")
+
+        if parent is not None:
+            self.setParent(parent)
 
         self.loadFinished.connect(self._on_load_finished)
 
