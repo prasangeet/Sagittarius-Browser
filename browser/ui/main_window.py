@@ -1,212 +1,184 @@
-from PySide6.QtNetwork import QNetworkInformation
-from typing import Optional, cast, Union
+from typing import cast
 from PySide6.QtWidgets import (
-    QMainWindow, QWidget, QVBoxLayout, QHBoxLayout,
-    QToolBar, QTabBar, QStackedWidget,
-    QToolButton, QStyle
+    QMainWindow, QStyle, QWidget, QVBoxLayout, QHBoxLayout,
+    QToolBar, QTabBar, QStackedWidget, QToolButton
 )
-from PySide6.QtGui import QAction, QIcon
-from PySide6.QtCore import QUrl, QSize
+from PySide6.QtGui import QAction
+from PySide6.QtCore import QUrl, QTimer
 from PySide6.QtWebEngineWidgets import QWebEngineView
-from .address_bar import AddressBar
-from .browser_tab import BrowserTab
-# Optional icons
-try:
-    import qtawesome as qta
-except ImportError:
-    qta = None
+from browser.ui.address_bar import AddressBar
+from browser.utils.debug import dbg
 
 class MainWindow(QMainWindow):
-    net_info : Optional[QNetworkInformation]
     def __init__(self, controller):
         super().__init__()
+        dbg("MainWindow.__init__ start")
+
         self.controller = controller
         self.setWindowTitle("Sagittarius Browser")
         self.resize(1200, 800)
 
-        self.net_info = QNetworkInformation.instance()
-
-
-        # -------- Central widget --------
         central = QWidget(self)
         self.setCentralWidget(central)
 
-        self.main_layout = QVBoxLayout(central)
-        self.main_layout.setContentsMargins(0, 0, 0, 0)
-        self.main_layout.setSpacing(0)
+        layout = QVBoxLayout(central)
+        layout.setContentsMargins(0, 0, 0, 0)
 
-        # -------- Tab bar row --------
+        # Tabs
         tab_row = QWidget()
         tab_layout = QHBoxLayout(tab_row)
         tab_layout.setContentsMargins(0, 0, 0, 0)
-        tab_layout.setSpacing(0)
 
         self.tab_bar = QTabBar()
-        self.tab_bar.setDocumentMode(True)
-        self.tab_bar.setMovable(True)
-        self.tab_bar.setTabsClosable(False)
-        self.tab_bar.setExpanding(False)
         self.tab_bar.currentChanged.connect(self._on_tab_changed)
-        
         tab_layout.addWidget(self.tab_bar)
 
-        # Add Tab Button
-        self.add_tab_btn = QToolButton()
-        self.add_tab_btn.setText("+")
-        self.add_tab_btn.setToolTip("New Tab")
-        self.add_tab_btn.setObjectName("NewTabButton")
-        self.add_tab_btn.clicked.connect(self.add_tab)
-        tab_layout.addWidget(self.add_tab_btn)
+        add_btn = QToolButton()
+        add_btn.setText("+")
+        add_btn.clicked.connect(self.add_tab)
+        tab_layout.addWidget(add_btn)
 
-        tab_layout.addStretch()
-        self.main_layout.addWidget(tab_row)
+        layout.addWidget(tab_row)
 
-        # -------- Toolbar --------
+        # Toolbar
         toolbar = QToolBar()
-        toolbar.setMovable(False)
-        toolbar.setFixedHeight(46)
-        toolbar.setIconSize(QSize(18, 18))
-        self.main_layout.addWidget(toolbar)
+        layout.addWidget(toolbar)
 
-        # Icon Helper
-        def icon(name: str, fallback: QStyle.StandardPixmap) -> QIcon:
-            if qta:
-                return qta.icon(name, color="#EAEAEA", color_active="#FB542B")
-            return self.style().standardIcon(fallback)
+        style = self.style()
 
-        back_act = QAction(icon("fa5s.arrow-left", QStyle.StandardPixmap.SP_ArrowBack), "Back", self)
-        back_act.triggered.connect(self.go_back)
-        toolbar.addAction(back_act)
+        back = QAction(style.standardIcon(QStyle.StandardPixmap.SP_ArrowBack), "", self)
+        back.setToolTip("Back")
+        back.triggered.connect(self.go_back)
+        toolbar.addAction(back)
 
-        fwd_act = QAction(icon("fa5s.arrow-right", QStyle.StandardPixmap.SP_ArrowForward), "Forward", self)
-        fwd_act.triggered.connect(self.go_forward)
-        toolbar.addAction(fwd_act)
+        fwd = QAction(style.standardIcon(QStyle.StandardPixmap.SP_ArrowForward), "", self)
+        fwd.setToolTip("Forward")
+        fwd.triggered.connect(self.go_forward)
+        toolbar.addAction(fwd)
 
-        reload_act = QAction(icon("fa5s.redo", QStyle.StandardPixmap.SP_BrowserReload), "Reload", self)
-        reload_act.triggered.connect(self.reload_page)
-        toolbar.addAction(reload_act)
+        reload_ = QAction(style.standardIcon(QStyle.StandardPixmap.SP_BrowserReload), "", self)
+        reload_.setToolTip("Reload")
+        reload_.triggered.connect(self.reload_page)
+        toolbar.addAction(reload_)
 
-        self.url_bar = AddressBar()
-        self.url_bar.returnPressed.connect(self.load_url)
-        toolbar.addWidget(self.url_bar)
+        self.address_bar = AddressBar()
+        self.address_bar.returnPressed.connect(self.load_url)
+        toolbar.addWidget(self.address_bar)
 
-        # -------- Web views --------
+        # Pages
         self.pages = QStackedWidget()
-        self.main_layout.addWidget(self.pages)
+        layout.addWidget(self.pages)
 
-        # Initial tab
         self.add_tab()
 
-    # ==================================================
-    # Tabs
-    # ==================================================
-    def add_tab(self, url: Union[str, bool, None] = None):
-        if not isinstance(url, str):
-            url = "https://www.google.com"
+        # 🚨 THIS IS THE IMPORTANT PART 🚨
+        # Defer navigation until event loop is alive
+        QTimer.singleShot(0, self._load_initial_url)
 
-        view = BrowserTab(url)
+        dbg("MainWindow.__init__ end")
 
-        index = self.pages.addWidget(view)
+        self.setStyleSheet("""
+        /* =========================
+           GLOBAL
+           ========================= */
+        QMainWindow {
+            background-color: #0f1115;
+        }
+
+        QWidget {
+            color: #e5e7eb;
+            font-family: Inter, Segoe UI, sans-serif;
+        }
+
+        /* =========================
+           TAB BAR
+           ========================= */
+        QTabBar {
+            background: #0f1115;
+            padding-left: 8px;
+        }
+
+        QTabBar::tab {
+            background: #16181d;
+            color: #9ca3af;
+            padding: 8px 16px;
+            margin-right: 6px;
+            border-top-left-radius: 10px;
+            border-top-right-radius: 10px;
+            min-width: 120px;
+        }
+
+        QTabBar::tab:selected {
+            background: #1f2937;
+            color: #ffffff;
+        }
+
+        QTabBar::tab:hover {
+            background: #23262d;
+            color: #ffffff;
+        }
+
+        /* =========================
+           TOOLBAR
+           ========================= */
+        QToolBar {
+            background: #16181d;
+            border: none;
+            padding: 6px;
+        }
+
+        QToolButton {
+            background: transparent;
+            border-radius: 6px;
+            padding: 6px;
+        }
+
+        QToolButton:hover {
+            background: #23262d;
+        }
+
+        /* =========================
+           ADD TAB BUTTON
+           ========================= */
+        QToolButton[text="+"] {
+            font-size: 18px;
+            padding: 0 10px;
+        }
+
+        /* =========================
+           STACKED PAGES
+           ========================= */
+        QStackedWidget {
+            background: #0f1115;
+        }
+        """)
+    def add_tab(self):
+        dbg("Adding new tab")
+        view = self.controller.create_view()
+
+        idx = self.pages.addWidget(view)
         self.tab_bar.addTab("New Tab")
-        
-        # --- MANUAL CLOSE BUTTON ---
-        close_btn = QToolButton()
-        close_btn.setText("✕")
-        close_btn.setObjectName("TabCloseButton")
-        close_btn.setToolTip("Close Tab")
-        close_btn.clicked.connect(self.close_tab_from_button)
 
-        self.tab_bar.setTabButton(index, QTabBar.ButtonPosition.RightSide, close_btn)
-        
-        self.tab_bar.setCurrentIndex(index)
-        self.pages.setCurrentIndex(index)
+        self.pages.setCurrentIndex(idx)
+        self.tab_bar.setCurrentIndex(idx)
 
-        # --- SIGNALS ---
-        view.titleChanged.connect(lambda t, v=view: self._update_title(v, t))
-        view.urlChanged.connect(self.update_url_bar)
-        view.iconChanged.connect(lambda i, v=view: self._update_icon(v, i))
-
-    def _update_icon(self, view: QWebEngineView, icon: QIcon):
-        """Updates the tab icon when the website favicon loads."""
-        index = self.pages.indexOf(view)
-        if index != -1 and not icon.isNull():
-            self.tab_bar.setTabIcon(index, icon)
-
-    def close_tab_from_button(self):
-        btn = self.sender()
-        for i in range(self.tab_bar.count()):
-            if self.tab_bar.tabButton(i, QTabBar.ButtonPosition.RightSide) == btn:
-                self.close_tab(i)
-                break
-
-    def close_tab(self, index: int):
-        if self.tab_bar.count() > 1:
-            widget = self.pages.widget(index)
-            self.pages.removeWidget(widget)
-            widget.deleteLater()
-            self.tab_bar.removeTab(index)
+    def _load_initial_url(self):
+        dbg("Deferred URL load")
+        view = cast(QWebEngineView, self.pages.currentWidget())
+        view.setUrl(QUrl("https://www.google.com"))
 
     def _on_tab_changed(self, index: int):
-        if index >= 0:
-            self.pages.setCurrentIndex(index)
-            self.update_url_bar()
-
-    def _update_title(self, view: QWebEngineView, title: str):
-        index = self.pages.indexOf(view)
-        if index != -1:
-            self.tab_bar.setTabText(index, title[:20])
-
-    # ==================================================
-    # Navigation
-    # ==================================================
-    def load_url(self):
-        view = cast(QWebEngineView, self.pages.currentWidget())
-        if not view:
-            return
-
-        # ---- FIX 3: offline check ----
-        if self.net_info is not None:
-            if self.net_info.reachability() == QNetworkInformation.Reachability.Disconnected:
-                view.setHtml(
-                    """
-                    <html>
-                      <body style="font-family:sans-serif;background:#111;color:#eee;
-                                   display:flex;align-items:center;justify-content:center;height:100vh;">
-                        <div>
-                          <h2>Offline</h2>
-                          <p>No internet connection.</p>
-                        </div>
-                      </body>
-                    </html>
-                    """
-                )
-                return
-
-        text = self.url_bar.text().strip()
-        if not text:
-            return
-
-        if "." not in text:
-            text = f"https://www.google.com/search?q={text}"
-        elif not text.startswith("http"):
-            text = "https://" + text
-
-        view.setUrl(QUrl(text))
-
-
-    def update_url_bar(self):
-        view = self.pages.currentWidget()
-        if isinstance(view, QWebEngineView):
-            self.url_bar.setText(view.url().toString())
+        self.pages.setCurrentIndex(index)
 
     def go_back(self):
         view = cast(QWebEngineView, self.pages.currentWidget())
-        if view: view.back()
+        view.back()
 
     def go_forward(self):
         view = cast(QWebEngineView, self.pages.currentWidget())
-        if view: view.forward()
+        view.forward()
 
     def reload_page(self):
         view = cast(QWebEngineView, self.pages.currentWidget())
-        if view: view.reload()
+        view.reload()
+

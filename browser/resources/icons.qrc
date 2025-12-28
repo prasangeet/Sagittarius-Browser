@@ -1,0 +1,8 @@
+<RCC>
+  <qresource prefix="icons">
+    <file>icons/back.svg</file>
+    <file>icons/forward.svg</file>
+    <file>icons/new_tab.svg</file>
+    <file>icons/reload.svg</file>
+  </qresource>
+</RCC>
